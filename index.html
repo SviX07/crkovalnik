@@ -631,6 +631,8 @@
     streak: 0,
     currentWordLetters: [], // for mode 2 (word spelling): letters of active word
     customWord: null,
+    wordSubmitted: false, // mode 2: whole-word answer already checked for this round
+    wordResultMessage: "", // mode 2: feedback text shown after whole-word check
     weakStats: { si: loadWeakStats("si"), en: loadWeakStats("en") }, // per-language: {LETTER: {weak, streak}}
     weakCurrent: null,   // {letter, word} currently shown in mode 3
     weakHistory: [],      // rolling 'ok'/'bad' trail for mode 3
@@ -700,6 +702,8 @@
       const letters = word.toUpperCase().split("").filter(ch => map[ch] !== undefined || /[A-ZČŠŽ]/.test(ch));
       state.currentWordLetters = letters;
       state.queue = letters.map(l => ({letter:l, word: map[l] || "?"}));
+      state.wordSubmitted = false;
+      state.wordResultMessage = "";
     }
     state.idx = 0;
     state.results = new Array(state.queue.length).fill(null);
@@ -770,18 +774,44 @@
 
   function langCode(){ return state.lang === "si" ? "sl-SI" : "en-US"; }
 
-  function speak(text){
+  // najmanjši čas poslušanja za en sam odgovor (ena črka)
+  const MIN_LISTEN_MS = 10000;
+  // pri celi besedi (način 03) uporabnik izgovori vse kod-besede naenkrat,
+  // zato je čas poslušanja podaljšan glede na dolžino besede
+  const LISTEN_MS_PER_LETTER = 4500;
+
+  function listenDurationMs(){
+    if(state.mode === 2){
+      return Math.max(MIN_LISTEN_MS, state.currentWordLetters.length * LISTEN_MS_PER_LETTER);
+    }
+    return MIN_LISTEN_MS;
+  }
+
+  function pickVoice(lang){
+    const voices = window.speechSynthesis.getVoices();
+    const wanted = lang.toLowerCase();
+    const base = wanted.split("-")[0];
+    const exact = voices.filter(v => v.lang && v.lang.toLowerCase() === wanted);
+    const related = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(base));
+    const pool = exact.length ? exact : related;
+    if(!pool.length) return null;
+    // mrežni glasovi (npr. "Google") so praviloma bolj razločni od lokalnih sistemskih
+    return pool.find(v => /google/i.test(v.name)) || pool[0];
+  }
+
+  // isLetter: pri izgovorjavi posamezne črke dodamo piko, da jo TTS izgovori
+  // počasneje in razločneje namesto da jo "požre" kot zelo kratek zvok
+  function speak(text, isLetter){
     if(!TTS_SUPPORTED || !text) return;
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = langCode();
-    u.rate = 0.85;
-    const voices = window.speechSynthesis.getVoices();
-    const wanted = u.lang.toLowerCase();
-    const base = wanted.split("-")[0];
-    const match = voices.find(v => v.lang && v.lang.toLowerCase() === wanted) ||
-                  voices.find(v => v.lang && v.lang.toLowerCase().startsWith(base));
-    if(match) u.voice = match;
+    const lang = langCode();
+    const u = new SpeechSynthesisUtterance(isLetter ? `${text}.` : text);
+    u.lang = lang;
+    u.rate = isLetter ? 0.72 : 0.82;
+    u.pitch = 1;
+    u.volume = 1;
+    const voice = pickVoice(lang);
+    if(voice) u.voice = voice;
     window.speechSynthesis.speak(u);
   }
 
@@ -793,8 +823,13 @@
 
   function speakCurrentPrompt(){
     if(state.ioMode !== "voice") return;
+    if(state.mode === 2){
+      if(state.wordSubmitted || !state.currentWordLetters.length) return;
+      speak(state.currentWordLetters.join(""), false);
+      return;
+    }
     const letter = currentPromptLetter();
-    if(letter) speak(letter);
+    if(letter) speak(letter, true);
   }
 
   function stopListeningUI(){
@@ -814,32 +849,62 @@
 
     recognition = new SR_CTOR();
     recognition.lang = langCode();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
+    let finalTranscript = "";
     state.listening = true;
     el.submitBtn.classList.add("listening");
-    el.submitBtn.textContent = "● Poslušam …";
+    el.submitBtn.textContent = "● Poslušam … (klik za konec)";
     el.answerInput.value = "";
 
+    const timer = setTimeout(() => {
+      try{ recognition.stop(); }catch(e){}
+    }, listenDurationMs());
+
     recognition.onresult = (e) => {
-      const transcript = e.results[0][0].transcript.trim();
-      el.answerInput.value = transcript;
-      stopListeningUI();
-      if(transcript) submit();
+      let interim = "";
+      for(let i = e.resultIndex; i < e.results.length; i++){
+        const segment = e.results[i][0].transcript;
+        if(e.results[i].isFinal){
+          finalTranscript += (finalTranscript ? " " : "") + segment.trim();
+        } else {
+          interim += segment;
+        }
+      }
+      el.answerInput.value = (finalTranscript + " " + interim).trim();
     };
-    recognition.onerror = () => { stopListeningUI(); };
-    recognition.onend = () => { stopListeningUI(); };
+    recognition.onerror = () => { clearTimeout(timer); stopListeningUI(); };
+    recognition.onend = () => {
+      clearTimeout(timer);
+      stopListeningUI();
+      const answer = (finalTranscript || el.answerInput.value).trim();
+      el.answerInput.value = answer;
+      if(answer) submit();
+    };
 
     try{ recognition.start(); }
-    catch(e){ stopListeningUI(); }
+    catch(e){ clearTimeout(timer); stopListeningUI(); }
+  }
+
+  function updatePlaceholder(){
+    const voice = state.ioMode === "voice";
+    if(state.mode === 2){
+      el.answerInput.placeholder = voice
+        ? "pritisni mikrofon in izgovori VSE besede naenkrat …"
+        : "vtipkaj VSE besede, ločene s presledkom …";
+    } else {
+      el.answerInput.placeholder = voice
+        ? "pritisni mikrofon in izgovori besedo …"
+        : "vtipkaj besedo za to črko …";
+    }
   }
 
   function applyIoModeUI(){
     const voice = state.ioMode === "voice";
     el.answerInput.readOnly = voice;
-    el.answerInput.placeholder = voice ? "pritisni mikrofon in izgovori besedo …" : "vtipkaj besedo za to črko …";
+    updatePlaceholder();
     el.speakBtn.style.display = voice ? "inline-block" : "none";
     el.submitBtn.classList.toggle("mic", voice);
     stopListeningUI();
@@ -852,6 +917,7 @@
       btn.classList.toggle("active", Number(btn.dataset.mode) === state.mode);
     });
     el.customWordRow.classList.toggle("show", state.mode === 2);
+    updatePlaceholder();
   }
 
   function renderProgress(){
@@ -861,7 +927,7 @@
       d.className = "pd";
       if(state.results[i] === "ok") d.classList.add("ok");
       else if(state.results[i] === "bad") d.classList.add("bad");
-      else if(i === state.idx) d.classList.add("now");
+      else if(state.mode !== 2 && i === state.idx) d.classList.add("now");
       el.progress.appendChild(d);
     });
   }
@@ -873,7 +939,11 @@
     const total = state.queue.length;
     const cur = state.queue[state.idx];
 
-    el.metaLeft.textContent = `${alpha.unit === "letter" ? "LETTER" : "ČRKA"} ${Math.min(state.idx+1,total)} / ${total}`;
+    if(state.mode === 2){
+      el.metaLeft.textContent = `BESEDA · ${total} ${alpha.unit === "letter" ? "LETTERS" : "ČRK"}`;
+    } else {
+      el.metaLeft.textContent = `${alpha.unit === "letter" ? "LETTER" : "ČRKA"} ${Math.min(state.idx+1,total)} / ${total}`;
+    }
 
     if(!cur){
       el.lcdMain.innerHTML = `<div class="letter-big" style="font-size:34px;">KONEC</div>`;
@@ -890,11 +960,14 @@
         let cls = "tile";
         if(state.results[i] === "ok") cls += " done-ok";
         else if(state.results[i] === "bad") cls += " done-bad";
-        else if(i === state.idx) cls += " current";
+        else if(!state.wordSubmitted) cls += " current";
         return `<div class="${cls}">${l}</div>`;
       }).join("");
       el.lcdMain.innerHTML = `<div class="word-tiles">${tilesHtml}</div>`;
-      el.promptWord.textContent = `beseda: ${state.currentWordLetters.join("")}`;
+      el.promptWord.textContent = state.wordSubmitted
+        ? state.wordResultMessage
+        : `izgovori/vtipkaj VSE besede za: ${state.currentWordLetters.join("")}`;
+      el.answerInput.disabled = state.wordSubmitted;
     } else {
       el.lcdMain.innerHTML = `<div class="letter-big">${cur.letter}</div>`;
       el.promptWord.textContent = "vpiši besedo za to črko";
@@ -950,6 +1023,7 @@
 
   function submit(){
     if(state.mode === 3){ submitWeak(); return; }
+    if(state.mode === 2){ submitWholeWord(); return; }
 
     const cur = state.queue[state.idx];
     if(!cur) return;
@@ -980,6 +1054,59 @@
       renderScreen();
       el.answerInput.focus();
     }, ok ? 260 : 750);
+  }
+
+  // način 03: cela beseda se preveri naenkrat - vhod mora vsebovati VSE
+  // kod-besede za vse črke besede, v pravilnem vrstnem redu, ločene s presledki
+  // (tako pri tipkanju kot po prepoznavi govora, ki jih zbere v en niz).
+  function submitWholeWord(){
+    const letters = state.currentWordLetters;
+    if(!letters.length || state.wordSubmitted) return;
+    const raw = el.answerInput.value.trim();
+    if(raw === "") return;
+    const tokens = raw.split(/\s+/).filter(Boolean);
+
+    let allOk = true;
+    letters.forEach((letter, i) => {
+      const expected = state.queue[i].word;
+      const given = tokens[i] || "";
+      const ok = given !== "" && normalize(given) === normalize(expected);
+      state.results[i] = ok ? "ok" : "bad";
+      recordLetterResult(letter, ok);
+      state.attempts++;
+      if(ok){ state.score++; state.streak++; }
+      else { state.streak = 0; allOk = false; }
+    });
+
+    state.wordSubmitted = true;
+    flash(allOk);
+    if(allOk){
+      state.wordResultMessage = "vse pravilno! 🎉";
+    } else {
+      const mistakes = letters
+        .map((l,i) => state.results[i] === "bad" ? `${l}→${state.queue[i].word}` : null)
+        .filter(Boolean).join(", ");
+      state.wordResultMessage = `napake: ${mistakes}`;
+    }
+
+    renderStats();
+    el.answerInput.value = "";
+    renderScreen();
+  }
+
+  function skipWholeWord(){
+    const letters = state.currentWordLetters;
+    if(!letters.length || state.wordSubmitted) return;
+    letters.forEach((letter, i) => {
+      state.results[i] = "bad";
+      recordLetterResult(letter, false);
+    });
+    state.streak = 0;
+    state.wordSubmitted = true;
+    state.wordResultMessage = `rešitev: ${letters.map((l,i) => state.queue[i].word).join(" ")}`;
+    renderStats();
+    el.answerInput.value = "";
+    renderScreen();
   }
 
   function submitWeak(){
@@ -1016,6 +1143,7 @@
 
   function skip(){
     if(state.mode === 3){ skipWeak(); return; }
+    if(state.mode === 2){ skipWholeWord(); return; }
     const cur = state.queue[state.idx];
     if(!cur) return;
     recordLetterResult(cur.letter, false);
@@ -1128,8 +1256,9 @@
   });
 
   el.submitBtn.addEventListener("click", () => {
-    if(state.ioMode === "voice") startListening();
-    else submit();
+    if(state.ioMode !== "voice"){ submit(); return; }
+    if(state.listening){ try{ recognition.stop(); }catch(e){} }
+    else startListening();
   });
   el.answerInput.addEventListener("keydown", (e) => {
     if(e.key === "Enter" && state.ioMode === "text") submit();
@@ -1145,6 +1274,7 @@
   });
 
   // init
+  if(TTS_SUPPORTED) window.speechSynthesis.getVoices(); // spodbudi zgodnje nalaganje glasov
   el.lblSi.classList.add("active");
   if(!SR_CTOR){
     el.ioToggle.classList.add("disabled");
