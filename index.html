@@ -835,7 +835,7 @@
   function stopListeningUI(){
     state.listening = false;
     el.submitBtn.classList.remove("listening");
-    el.submitBtn.textContent = "🎙 Govori";
+    el.submitBtn.textContent = state.ioMode === "voice" ? "🎙 Govori" : "Preveri";
   }
 
   function startListening(){
@@ -1094,19 +1094,23 @@
     renderScreen();
   }
 
-  function skipWholeWord(){
-    const letters = state.currentWordLetters;
-    if(!letters.length || state.wordSubmitted) return;
-    letters.forEach((letter, i) => {
-      state.results[i] = "bad";
-      recordLetterResult(letter, false);
-    });
-    state.streak = 0;
-    state.wordSubmitted = true;
-    state.wordResultMessage = `rešitev: ${letters.map((l,i) => state.queue[i].word).join(" ")}`;
-    renderStats();
+  // "Preskoči" pri načinu 03: naloži novo (drugo) besedo
+  function nextWholeWord(){
+    buildQueue();
     el.answerInput.value = "";
     renderScreen();
+    el.answerInput.focus();
+  }
+
+  // "Znova" pri načinu 03: ponovi isto besedo (počisti le napredek tega poskusa)
+  function retryWholeWord(){
+    if(!state.currentWordLetters.length) return;
+    state.results = new Array(state.queue.length).fill(null);
+    state.wordSubmitted = false;
+    state.wordResultMessage = "";
+    el.answerInput.value = "";
+    renderScreen();
+    el.answerInput.focus();
   }
 
   function submitWeak(){
@@ -1143,7 +1147,7 @@
 
   function skip(){
     if(state.mode === 3){ skipWeak(); return; }
-    if(state.mode === 2){ skipWholeWord(); return; }
+    if(state.mode === 2){ nextWholeWord(); return; }
     const cur = state.queue[state.idx];
     if(!cur) return;
     recordLetterResult(cur.letter, false);
@@ -1265,7 +1269,11 @@
   });
   el.speakBtn.addEventListener("click", () => speakCurrentPrompt());
   el.skipBtn.addEventListener("click", () => { cancelSpeech(); skip(); });
-  el.restartBtn.addEventListener("click", () => { cancelSpeech(); resetAll(); });
+  el.restartBtn.addEventListener("click", () => {
+    cancelSpeech();
+    if(state.mode === 2){ retryWholeWord(); }
+    else { resetAll(); }
+  });
 
   el.refToggle.addEventListener("click", () => {
     buildRefTable();
