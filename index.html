@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ČRKOVALNIK — vadba črkovalne abecede</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;900&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#0d0c09;
+    --bg-1:#17150f;
+    --panel:#201d16;
+    --panel-2:#26221a;
+    --metal-hi:#3a3527;
+    --metal-lo:#0a0904;
+    --seam:#403a29;
+    --amber:#ff9d1c;
+    --amber-dim:#8a5710;
+    --amber-glow:rgba(255,157,28,0.55);
+    --green:#5dffa0;
+    --green-dim:#1e6b45;
+    --red:#ff5d5d;
+    --red-dim:#7a2222;
+    --cream:#f3ead9;
+    --cream-dim:#a89a80;
+    --lcd-bg:#12190f;
+    --lcd-fg:#8ef0a0;
+    --lcd-fg-dim:#2f5a3a;
+    --font-display:'Big Shoulders Display', sans-serif;
+    --font-mono:'JetBrains Mono', monospace;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(255,157,28,0.07), transparent 45%),
+      radial-gradient(ellipse at 100% 110%, rgba(93,255,160,0.05), transparent 50%),
+      var(--bg-0);
+    color:var(--cream);
+    font-family:var(--font-mono);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:28px 16px;
+    position:relative;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events:none;
+    mix-blend-mode:overlay;
+    z-index:1000;
+  }
+
+  .console{
+    width:100%;
+    max-width:760px;
+    background:linear-gradient(160deg, var(--metal-hi), var(--bg-1) 40%, var(--metal-lo) 100%);
+    border-radius:22px;
+    padding:3px;
+    box-shadow:
+      0 40px 80px -20px rgba(0,0,0,0.8),
+      0 2px 0 rgba(255,255,255,0.04) inset;
+  }
+  .console-inner{
+    background:var(--panel);
+    border-radius:20px;
+    padding:26px 26px 22px;
+    position:relative;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 -1px 0 rgba(0,0,0,0.5) inset;
+  }
+  .rivet{
+    position:absolute;
+    width:7px; height:7px;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #6b634a, #14120c 70%);
+    box-shadow:0 1px 1px rgba(0,0,0,0.6);
+  }
+  .rivet.tl{top:12px;left:12px;} .rivet.tr{top:12px;right:12px;}
+  .rivet.bl{bottom:12px;left:12px;} .rivet.br{bottom:12px;right:12px;}
+
+  /* header */
+  .header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:20px;
+    padding-bottom:16px;
+    border-bottom:1px solid var(--seam);
+  }
+  .brand{display:flex; flex-direction:column; gap:2px;}
+  .brand .kicker{
+    font-size:10px;
+    letter-spacing:0.32em;
+    color:var(--amber-dim);
+    text-transform:uppercase;
+    font-weight:600;
+  }
+  .brand h1{
+    font-family:var(--font-display);
+    font-weight:900;
+    font-size:34px;
+    letter-spacing:0.01em;
+    margin:0;
+    line-height:0.95;
+    color:var(--cream);
+    text-shadow:0 0 24px rgba(255,157,28,0.15);
+  }
+  .brand h1 span{color:var(--amber);}
+
+  /* language toggle switch */
+  .lang-switch{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--panel-2);
+    border-radius:12px;
+    padding:8px 10px;
+    box-shadow:0 1px 0 rgba(255,255,255,0.03) inset, 0 2px 6px rgba(0,0,0,0.4) inset;
+    border:1px solid var(--seam);
+  }
+  .lang-switch .lbl{
+    font-size:11px;
+    letter-spacing:0.08em;
+    font-weight:700;
+    color:var(--cream-dim);
+    transition:color .2s;
+    user-select:none;
+  }
+  .lang-switch .lbl.active{color:var(--amber); text-shadow:0 0 10px var(--amber-glow);}
+  .toggle{
+    width:52px; height:26px;
+    border-radius:14px;
+    background:linear-gradient(180deg,#0c0a06,#1b1811);
+    box-shadow:0 2px 5px rgba(0,0,0,0.6) inset, 0 1px 0 rgba(255,255,255,0.05);
+    position:relative;
+    cursor:pointer;
+    border:1px solid #050402;
+    flex:none;
+  }
+  .toggle .knob{
+    position:absolute;
+    top:2px; left:2px;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #ffcf8a, var(--amber) 60%, var(--amber-dim) 100%);
+    box-shadow:0 2px 4px rgba(0,0,0,0.5), 0 0 10px var(--amber-glow);
+    transition:left .22s cubic-bezier(.7,-0.3,.3,1.3);
+  }
+  .toggle.on .knob{left:28px; background:radial-gradient(circle at 35% 30%, #b9ffd2, var(--green) 60%, var(--green-dim) 100%); box-shadow:0 2px 4px rgba(0,0,0,0.5), 0 0 10px rgba(93,255,160,0.5);}
+
+  /* mode buttons */
+  .modes{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+    margin-bottom:20px;
+  }
+  .mode-btn{
+    font-family:var(--font-mono);
+    background:linear-gradient(180deg, var(--panel-2), #1a170f);
+    border:1px solid var(--seam);
+    border-radius:12px;
+    padding:12px 10px 11px;
+    color:var(--cream-dim);
+    cursor:pointer;
+    text-align:left;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    box-shadow:0 3px 0 rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset;
+    transition:transform .1s, box-shadow .1s, color .15s, border-color .15s;
+    position:relative;
+  }
+  .mode-btn:active{transform:translateY(2px); box-shadow:0 1px 0 rgba(0,0,0,0.5);}
+  .mode-btn .dot{
+    width:8px; height:8px; border-radius:50%;
+    background:#3a3527;
+    box-shadow:0 0 0 rgba(0,0,0,0);
+    transition:.2s;
+  }
+  .mode-btn .num{font-size:10px; letter-spacing:0.15em; color:var(--metal-hi); font-weight:700;}
+  .mode-btn .title{font-size:12.5px; font-weight:600; color:inherit; line-height:1.25;}
+  .mode-btn.active{
+    color:var(--cream);
+    border-color:var(--amber-dim);
+    box-shadow:0 3px 0 rgba(0,0,0,0.5), 0 0 0 1px rgba(255,157,28,0.15) inset, 0 0 18px rgba(255,157,28,0.08);
+  }
+  .mode-btn.active .dot{background:var(--amber); box-shadow:0 0 8px var(--amber-glow);}
+  .mode-btn.active .num{color:var(--amber-dim);}
+  .mode-btn[data-mode="3"] .dot{background:#5a2a2a;}
+  .mode-btn[data-mode="3"].active{border-color:var(--red-dim); box-shadow:0 3px 0 rgba(0,0,0,0.5), 0 0 0 1px rgba(255,93,93,0.18) inset, 0 0 18px rgba(255,93,93,0.1);}
+  .mode-btn[data-mode="3"].active .dot{background:var(--red); box-shadow:0 0 8px rgba(255,93,93,0.6);}
+  .mode-btn[data-mode="3"].active .num{color:var(--red-dim);}
+  .mode-btn .weak-count{
+    font-size:9px; letter-spacing:0.1em; color:var(--red); font-weight:700;
+    background:rgba(255,93,93,0.1); border-radius:5px; padding:1px 5px;
+    align-self:flex-start; margin-top:-2px;
+  }
+
+  /* screen */
+  .screen-wrap{
+    background:linear-gradient(180deg,#050402,#0d0b07);
+    border-radius:14px;
+    padding:14px;
+    border:1px solid #000;
+    box-shadow:0 6px 16px rgba(0,0,0,0.5) inset, 0 1px 0 rgba(255,255,255,0.04);
+    margin-bottom:16px;
+  }
+  .lcd{
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.03), transparent 30%),
+      var(--lcd-bg);
+    border-radius:8px;
+    padding:22px 20px 18px;
+    min-height:168px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    position:relative;
+    overflow:hidden;
+    box-shadow:0 0 0 1px #030602 inset;
+  }
+  .lcd::after{
+    content:"";
+    position:absolute; inset:0;
+    background:repeating-linear-gradient(180deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 3px);
+    pointer-events:none;
+    opacity:0.5;
+  }
+  .lcd.flash-ok{animation:flashOk .5s ease;}
+  .lcd.flash-bad{animation:flashBad .5s ease;}
+  @keyframes flashOk{ 0%{box-shadow:0 0 0 1px #030602 inset, 0 0 40px rgba(93,255,160,0.55);} 100%{box-shadow:0 0 0 1px #030602 inset, 0 0 0 rgba(93,255,160,0);} }
+  @keyframes flashBad{ 0%{box-shadow:0 0 0 1px #030602 inset, 0 0 40px rgba(255,93,93,0.55);} 100%{box-shadow:0 0 0 1px #030602 inset, 0 0 0 rgba(255,93,93,0);} }
+
+  .lcd .meta-row{
+    display:flex; justify-content:space-between; width:100%;
+    font-size:10px; letter-spacing:0.2em; color:var(--lcd-fg-dim); font-weight:600;
+    text-transform:uppercase;
+  }
+  .lcd .meta-row .live{color:var(--lcd-fg); animation:blink 1.6s infinite;}
+  @keyframes blink{0%,60%{opacity:1;}61%,100%{opacity:0.35;}}
+
+  .letter-big{
+    font-family:var(--font-display);
+    font-weight:900;
+    font-size:88px;
+    line-height:1;
+    color:var(--lcd-fg);
+    text-shadow:0 0 18px rgba(142,240,160,0.45), 0 0 2px rgba(142,240,160,0.8);
+    letter-spacing:0.02em;
+  }
+
+  .word-tiles{
+    display:flex; flex-wrap:wrap; gap:6px; justify-content:center; max-width:100%;
+  }
+  .tile{
+    width:34px; height:40px;
+    border-radius:5px;
+    background:#0a1a0d;
+    border:1px solid var(--lcd-fg-dim);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display);
+    font-weight:800;
+    font-size:20px;
+    color:var(--lcd-fg-dim);
+    transition:all .18s;
+  }
+  .tile.current{
+    color:var(--lcd-fg);
+    border-color:var(--lcd-fg);
+    box-shadow:0 0 12px rgba(142,240,160,0.4);
+    animation:blink 1.6s infinite;
+  }
+  .tile.done-ok{color:var(--lcd-fg); border-color:var(--green-dim); background:rgba(93,255,160,0.08);}
+  .tile.done-bad{color:#ffb8b8; border-color:var(--red-dim); background:rgba(255,93,93,0.08);}
+
+  .prompt-word{
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:0.15em;
+    color:var(--lcd-fg-dim);
+    text-transform:uppercase;
+  }
+
+  /* progress dots */
+  .progress{
+    display:flex; gap:5px; flex-wrap:wrap; justify-content:center;
+    margin-bottom:16px; min-height:8px;
+  }
+  .progress .pd{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--metal-hi);
+    box-shadow:0 1px 1px rgba(0,0,0,0.5) inset;
+  }
+  .progress .pd.ok{background:var(--green); box-shadow:0 0 6px rgba(93,255,160,0.6);}
+  .progress .pd.bad{background:var(--red); box-shadow:0 0 6px rgba(255,93,93,0.6);}
+  .progress .pd.now{background:var(--amber); box-shadow:0 0 6px var(--amber-glow);}
+
+  /* input row */
+  .input-row{
+    display:flex;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .input-row input{
+    flex:1;
+    font-family:var(--font-mono);
+    font-size:16px;
+    font-weight:600;
+    background:var(--panel-2);
+    border:1px solid var(--seam);
+    border-radius:10px;
+    padding:14px 16px;
+    color:var(--cream);
+    outline:none;
+    box-shadow:0 2px 6px rgba(0,0,0,0.4) inset;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .input-row input::placeholder{color:#5a5340;}
+  .input-row input:focus{border-color:var(--amber-dim); box-shadow:0 2px 6px rgba(0,0,0,0.4) inset, 0 0 0 3px rgba(255,157,28,0.12);}
+  .btn{
+    font-family:var(--font-mono);
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:0.03em;
+    border-radius:10px;
+    border:1px solid var(--seam);
+    padding:0 18px;
+    cursor:pointer;
+    background:linear-gradient(180deg, var(--amber), #d67c00);
+    color:#241300;
+    box-shadow:0 3px 0 #7a4400, 0 1px 0 rgba(255,255,255,0.3) inset;
+    transition:transform .08s;
+  }
+  .btn:active{transform:translateY(2px); box-shadow:0 1px 0 #7a4400;}
+  .btn.ghost{
+    background:linear-gradient(180deg, var(--panel-2), #1a170f);
+    color:var(--cream-dim);
+    box-shadow:0 3px 0 rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset;
+  }
+
+  .below-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    flex-wrap:wrap;
+  }
+
+  /* stats */
+  .stats{
+    display:flex; gap:18px;
+  }
+  .stat{display:flex; flex-direction:column; gap:1px;}
+  .stat .v{font-family:var(--font-display); font-weight:800; font-size:22px; color:var(--amber); line-height:1;}
+  .stat .l{font-size:9px; letter-spacing:0.15em; color:var(--cream-dim); text-transform:uppercase; margin-top:3px;}
+
+  .actions{display:flex; gap:8px;}
+
+  /* custom word input for mode 3 */
+  .custom-word{
+    display:none;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .custom-word.show{display:flex;}
+  .custom-word input{
+    flex:1;
+    font-family:var(--font-mono);
+    font-size:13px;
+    background:var(--panel-2);
+    border:1px solid var(--seam);
+    border-radius:8px;
+    padding:9px 12px;
+    color:var(--cream-dim);
+    outline:none;
+  }
+  .custom-word input:focus{color:var(--cream); border-color:var(--amber-dim);}
+
+  /* reference table */
+  .ref-toggle{
+    margin-top:18px;
+    display:flex; align-items:center; justify-content:center;
+    gap:8px;
+    font-size:11px; letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--cream-dim);
+    cursor:pointer;
+    padding-top:14px;
+    border-top:1px solid var(--seam);
+    user-select:none;
+  }
+  .ref-toggle .chev{transition:transform .2s; color:var(--amber-dim);}
+  .ref-toggle.open .chev{transform:rotate(180deg);}
+  .ref-table{
+    display:none;
+    grid-template-columns:repeat(auto-fill, minmax(120px,1fr));
+    gap:6px;
+    margin-top:14px;
+  }
+  .ref-table.show{display:grid;}
+  .ref-item{
+    background:var(--panel-2);
+    border:1px solid var(--seam);
+    border-radius:8px;
+    padding:7px 10px;
+    font-size:12.5px;
+    display:flex; gap:8px; align-items:baseline;
+  }
+  .ref-item b{color:var(--amber); font-family:var(--font-display); font-size:16px; font-weight:800; min-width:16px;}
+  .ref-item span{color:var(--cream-dim);}
+  .ref-item.weak{border-color:var(--red-dim); box-shadow:0 0 0 1px rgba(255,93,93,0.15) inset;}
+  .ref-item.weak b{color:var(--red);}
+
+  footer.hint{
+    text-align:center;
+    font-size:10.5px;
+    color:var(--metal-hi);
+    margin-top:16px;
+    letter-spacing:0.05em;
+  }
+  footer.hint b{color:var(--amber-dim);}
+
+  @media (max-width:480px){
+    .brand h1{font-size:26px;}
+    .letter-big{font-size:64px;}
+    .modes{grid-template-columns:repeat(2,1fr); }
+    .stats{gap:12px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="console">
+  <div class="console-inner">
+    <div class="rivet tl"></div><div class="rivet tr"></div><div class="rivet bl"></div><div class="rivet br"></div>
+
+    <div class="header">
+      <div class="brand">
+        <div class="kicker">radijska vadbena postaja</div>
+        <h1>ČRKOV<span>ALNIK</span></h1>
+      </div>
+      <div class="lang-switch">
+        <span class="lbl" id="lblSi">SI</span>
+        <div class="toggle" id="langToggle" role="button" tabindex="0" aria-label="Preklopi jezik abecede"><div class="knob"></div></div>
+        <span class="lbl" id="lblEn">EN</span>
+      </div>
+    </div>
+
+    <div class="modes">
+      <button class="mode-btn active" data-mode="0">
+        <div class="num">NAČIN 01</div>
+        <div class="title">Črke po vrsti</div>
+        <div class="dot"></div>
+      </button>
+      <button class="mode-btn" data-mode="1">
+        <div class="num">NAČIN 02</div>
+        <div class="title">Naključne črke</div>
+        <div class="dot"></div>
+      </button>
+      <button class="mode-btn" data-mode="2">
+        <div class="num">NAČIN 03</div>
+        <div class="title">Črkovanje besed</div>
+        <div class="dot"></div>
+      </button>
+      <button class="mode-btn" data-mode="3">
+        <div class="num">NAČIN 04</div>
+        <div class="title">Šibke črke</div>
+        <span class="weak-count" id="weakCountBadge">0</span>
+        <div class="dot"></div>
+      </button>
+    </div>
+
+    <div class="custom-word" id="customWordRow">
+      <input type="text" id="customWordInput" placeholder="vpiši svojo besedo za črkovanje …">
+      <button class="btn ghost" id="useCustomWord">uporabi</button>
+    </div>
+
+    <div class="screen-wrap">
+      <div class="lcd" id="lcd">
+        <div class="meta-row">
+          <span id="metaLeft">ČRKA 1 / 25</span>
+          <span class="live" id="metaLive">● REC</span>
+        </div>
+        <div id="lcdMain">
+          <div class="letter-big" id="letterBig">A</div>
+        </div>
+        <div class="prompt-word" id="promptWord"></div>
+      </div>
+    </div>
+
+    <div class="progress" id="progress"></div>
+
+    <div class="input-row">
+      <input type="text" id="answerInput" placeholder="vtipkaj besedo za to črko …" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="btn" id="submitBtn">Preveri</button>
+    </div>
+
+    <div class="below-row">
+      <div class="stats">
+        <div class="stat"><div class="v" id="statScore">0</div><div class="l">Pravilnih</div></div>
+        <div class="stat"><div class="v" id="statStreak">0</div><div class="l">Niz</div></div>
+        <div class="stat"><div class="v" id="statAcc">100%</div><div class="l">Natančnost</div></div>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" id="skipBtn">Preskoči</button>
+        <button class="btn ghost" id="restartBtn">Znova</button>
+      </div>
+    </div>
+
+    <div class="ref-toggle" id="refToggle"><span>Prikaži celotno tabelo</span><span class="chev">▾</span></div>
+    <div class="ref-table" id="refTable"></div>
+
+    <footer class="hint"><b>Enter</b> za potrditev · <b>Preskoči</b> za naslednjo črko</footer>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const ALPHABETS = {
+    si: {
+      code: "si",
+      letters: [
+        ["A","Ankaran"],["B","Bled"],["C","Celje"],["Č","Čatež"],["D","Drava"],
+        ["E","Evropa"],["F","Fala"],["G","Gorica"],["H","Hrastnik"],["I","Izola"],
+        ["J","Jadran"],["K","Kamnik"],["L","Ljubljana"],["M","Maribor"],["N","Nanos"],
+        ["O","Ormož"],["P","Piran"],["R","Ravne"],["S","Soča"],["Š","Šmarje"],
+        ["T","Triglav"],["U","Unec"],["V","Velenje"],["Z","Zalog"],["Ž","Žalec"],
+        ["Q","Queen"],["W","Dvojni V"],["X","Iks"],["Y","Ipsilon"]
+      ],
+      words: ["MARIBOR","LJUBLJANA","SONCE","PRIJATELJ","ŠOLA","RAČUNALNIK","ŽOGA","KOLESO","MAČKA","HIŠA","VODA","GORA","MORJE","CVETLICA","PTICA","ZVEZDA","OGENJ","PLANINA","ČASOPIS","ŽELEZNICA"],
+      unit: "črka"
+    },
+    en: {
+      code: "en",
+      letters: [
+        ["A","Alpha"],["B","Bravo"],["C","Charlie"],["D","Delta"],["E","Echo"],
+        ["F","Foxtrot"],["G","Golf"],["H","Hotel"],["I","India"],["J","Juliett"],
+        ["K","Kilo"],["L","Lima"],["M","Mike"],["N","November"],["O","Oscar"],
+        ["P","Papa"],["Q","Quebec"],["R","Romeo"],["S","Sierra"],["T","Tango"],
+        ["U","Uniform"],["V","Victor"],["W","Whiskey"],["X","X-ray"],["Y","Yankee"],["Z","Zulu"]
+      ],
+      words: ["LONDON","AIRPORT","PILOT","RADIO","COMPUTER","GARDEN","MOUNTAIN","OCEAN","VILLAGE","KITCHEN","BICYCLE","SANDWICH","JUSTICE","YELLOW","QUALITY","WINDOW","ZEBRA","FOREST","ISLAND","VOYAGE"],
+      unit: "letter"
+    }
+  };
+
+  function normalize(str){
+    return str
+      .toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g,"")
+      .trim();
+  }
+
+  const state = {
+    lang: "si",
+    mode: 0,
+    queue: [],      // array of {letter, word}
+    idx: 0,
+    results: [],    // 'ok' | 'bad' per item in current queue
+    score: 0,
+    attempts: 0,
+    streak: 0,
+    currentWordLetters: [], // for mode 2 (word spelling): letters of active word
+    customWord: null,
+    weakStats: { si: loadWeakStats("si"), en: loadWeakStats("en") }, // per-language: {LETTER: {weak, streak}}
+    weakCurrent: null,   // {letter, word} currently shown in mode 3
+    weakHistory: []       // rolling 'ok'/'bad' trail for mode 3
+  };
+
+  const el = {
+    langToggle: document.getElementById("langToggle"),
+    lblSi: document.getElementById("lblSi"),
+    lblEn: document.getElementById("lblEn"),
+    modeBtns: [...document.querySelectorAll(".mode-btn")],
+    customWordRow: document.getElementById("customWordRow"),
+    customWordInput: document.getElementById("customWordInput"),
+    useCustomWord: document.getElementById("useCustomWord"),
+    lcd: document.getElementById("lcd"),
+    metaLeft: document.getElementById("metaLeft"),
+    lcdMain: document.getElementById("lcdMain"),
+    letterBig: document.getElementById("letterBig"),
+    promptWord: document.getElementById("promptWord"),
+    progress: document.getElementById("progress"),
+    answerInput: document.getElementById("answerInput"),
+    submitBtn: document.getElementById("submitBtn"),
+    skipBtn: document.getElementById("skipBtn"),
+    restartBtn: document.getElementById("restartBtn"),
+    statScore: document.getElementById("statScore"),
+    statStreak: document.getElementById("statStreak"),
+    statAcc: document.getElementById("statAcc"),
+    refToggle: document.getElementById("refToggle"),
+    refTable: document.getElementById("refTable"),
+    weakCountBadge: document.getElementById("weakCountBadge"),
+  };
+
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+
+  function currentAlphabet(){ return ALPHABETS[state.lang]; }
+
+  function letterToWordMap(){
+    const map = {};
+    currentAlphabet().letters.forEach(([l,w]) => map[l] = w);
+    return map;
+  }
+
+  function buildQueue(){
+    const alpha = currentAlphabet();
+    if(state.mode === 0){
+      state.queue = alpha.letters.map(([l,w]) => ({letter:l, word:w}));
+    } else if(state.mode === 1){
+      state.queue = shuffle(alpha.letters).map(([l,w]) => ({letter:l, word:w}));
+    } else if(state.mode === 2){
+      const map = letterToWordMap();
+      let word = state.customWord;
+      if(!word){
+        word = alpha.words[Math.floor(Math.random()*alpha.words.length)];
+      }
+      const letters = word.toUpperCase().split("").filter(ch => map[ch] !== undefined || /[A-ZČŠŽ]/.test(ch));
+      state.currentWordLetters = letters;
+      state.queue = letters.map(l => ({letter:l, word: map[l] || "?"}));
+    }
+    state.idx = 0;
+    state.results = new Array(state.queue.length).fill(null);
+  }
+
+  // --- šibke črke: obstojno sledenje po črkah, ločeno za vsak jezik ---
+  function loadWeakStats(lang){
+    try{
+      return JSON.parse(localStorage.getItem("crkovalnik_weak_"+lang)) || {};
+    } catch(e){ return {}; }
+  }
+
+  function saveWeakStats(lang){
+    try{
+      localStorage.setItem("crkovalnik_weak_"+lang, JSON.stringify(state.weakStats[lang]));
+    } catch(e){ /* localStorage nedosegljiv - tiho prezri */ }
+  }
+
+  // pravilo: napačen odgovor -> črka postane šibka; 2 zaporedna pravilna
+  // odgovora (kjerkoli v aplikaciji) -> črka izpade iz nabora šibkih.
+  function recordLetterResult(letter, ok){
+    const stats = state.weakStats[state.lang];
+    if(!stats[letter]) stats[letter] = { weak:false, streak:0 };
+    const s = stats[letter];
+    if(ok){
+      s.streak++;
+      if(s.weak && s.streak >= 2){ s.weak = false; s.streak = 0; }
+    } else {
+      s.weak = true;
+      s.streak = 0;
+    }
+    saveWeakStats(state.lang);
+    updateWeakBadge();
+    if(el.refTable.classList.contains("show")) buildRefTable();
+  }
+
+  function getWeakLetters(){
+    const stats = state.weakStats[state.lang];
+    return currentAlphabet().letters
+      .filter(([l]) => stats[l] && stats[l].weak)
+      .map(([l,w]) => ({letter:l, word:w}));
+  }
+
+  function updateWeakBadge(){
+    el.weakCountBadge.textContent = getWeakLetters().length;
+  }
+
+  function pickNextWeak(excludeLetter){
+    const pool = getWeakLetters();
+    if(pool.length === 0) return null;
+    let candidates = pool;
+    if(pool.length > 1 && excludeLetter){
+      candidates = pool.filter(p => p.letter !== excludeLetter);
+      if(candidates.length === 0) candidates = pool;
+    }
+    return candidates[Math.floor(Math.random()*candidates.length)];
+  }
+
+  function startWeakMode(){
+    state.weakHistory = [];
+    state.weakCurrent = pickNextWeak(null);
+  }
+
+  function updateModeButtons(){
+    el.modeBtns.forEach(btn => {
+      btn.classList.toggle("active", Number(btn.dataset.mode) === state.mode);
+    });
+    el.customWordRow.classList.toggle("show", state.mode === 2);
+  }
+
+  function renderProgress(){
+    el.progress.innerHTML = "";
+    state.queue.forEach((item,i) => {
+      const d = document.createElement("div");
+      d.className = "pd";
+      if(state.results[i] === "ok") d.classList.add("ok");
+      else if(state.results[i] === "bad") d.classList.add("bad");
+      else if(i === state.idx) d.classList.add("now");
+      el.progress.appendChild(d);
+    });
+  }
+
+  function renderScreen(){
+    if(state.mode === 3){ renderWeakScreen(); return; }
+
+    const alpha = currentAlphabet();
+    const total = state.queue.length;
+    const cur = state.queue[state.idx];
+
+    el.metaLeft.textContent = `${alpha.unit === "letter" ? "LETTER" : "ČRKA"} ${Math.min(state.idx+1,total)} / ${total}`;
+
+    if(!cur){
+      el.lcdMain.innerHTML = `<div class="letter-big" style="font-size:34px;">KONEC</div>`;
+      el.promptWord.textContent = "krog dokončan — pritisni Znova";
+      el.answerInput.disabled = true;
+      el.progress.classList.remove("hidden");
+      renderProgress();
+      return;
+    }
+    el.answerInput.disabled = false;
+
+    if(state.mode === 2){
+      const tilesHtml = state.currentWordLetters.map((l,i) => {
+        let cls = "tile";
+        if(state.results[i] === "ok") cls += " done-ok";
+        else if(state.results[i] === "bad") cls += " done-bad";
+        else if(i === state.idx) cls += " current";
+        return `<div class="${cls}">${l}</div>`;
+      }).join("");
+      el.lcdMain.innerHTML = `<div class="word-tiles">${tilesHtml}</div>`;
+      el.promptWord.textContent = `beseda: ${state.currentWordLetters.join("")}`;
+    } else {
+      el.lcdMain.innerHTML = `<div class="letter-big">${cur.letter}</div>`;
+      el.promptWord.textContent = "vpiši besedo za to črko";
+    }
+    renderProgress();
+  }
+
+  function renderWeakScreen(){
+    const poolSize = getWeakLetters().length;
+    el.metaLeft.textContent = `ŠIBKE ČRKE · ${poolSize} V NABORU`;
+    const cur = state.weakCurrent;
+
+    if(!cur){
+      el.lcdMain.innerHTML = `<div class="letter-big" style="font-size:26px; line-height:1.3;">NI ŠIBKIH ČRK</div>`;
+      el.promptWord.textContent = "vadi v drugih načinih, da odkrijemo tvoje šibke točke";
+      el.answerInput.disabled = true;
+    } else {
+      el.lcdMain.innerHTML = `<div class="letter-big">${cur.letter}</div>`;
+      el.promptWord.textContent = "vpiši besedo za to črko";
+      el.answerInput.disabled = false;
+    }
+    renderWeakProgress();
+  }
+
+  function renderWeakProgress(){
+    el.progress.innerHTML = "";
+    state.weakHistory.forEach(r => {
+      const d = document.createElement("div");
+      d.className = "pd " + (r === "ok" ? "ok" : "bad");
+      el.progress.appendChild(d);
+    });
+    if(state.weakCurrent){
+      const d = document.createElement("div");
+      d.className = "pd now";
+      el.progress.appendChild(d);
+    }
+  }
+
+  function renderStats(){
+    el.statScore.textContent = state.score;
+    el.statStreak.textContent = state.streak;
+    const acc = state.attempts === 0 ? 100 : Math.round((state.score/state.attempts)*100);
+    el.statAcc.textContent = acc + "%";
+  }
+
+  function flash(ok){
+    el.lcd.classList.remove("flash-ok","flash-bad");
+    void el.lcd.offsetWidth;
+    el.lcd.classList.add(ok ? "flash-ok" : "flash-bad");
+  }
+
+  function submit(){
+    if(state.mode === 3){ submitWeak(); return; }
+
+    const cur = state.queue[state.idx];
+    if(!cur) return;
+    const val = el.answerInput.value;
+    if(val.trim() === "") return;
+
+    const ok = normalize(val) === normalize(cur.word);
+    state.attempts++;
+    state.results[state.idx] = ok ? "ok" : "bad";
+    recordLetterResult(cur.letter, ok);
+
+    if(ok){
+      state.score++;
+      state.streak++;
+      flash(true);
+    } else {
+      state.streak = 0;
+      flash(false);
+      el.promptWord.textContent = `pravilno: ${cur.word}`;
+    }
+
+    renderStats();
+    renderProgress();
+    el.answerInput.value = "";
+
+    setTimeout(() => {
+      state.idx++;
+      renderScreen();
+      el.answerInput.focus();
+    }, ok ? 260 : 750);
+  }
+
+  function submitWeak(){
+    const cur = state.weakCurrent;
+    if(!cur) return;
+    const val = el.answerInput.value;
+    if(val.trim() === "") return;
+
+    const ok = normalize(val) === normalize(cur.word);
+    state.attempts++;
+    recordLetterResult(cur.letter, ok);
+    state.weakHistory.push(ok ? "ok" : "bad");
+    if(state.weakHistory.length > 14) state.weakHistory.shift();
+
+    if(ok){
+      state.score++;
+      state.streak++;
+      flash(true);
+    } else {
+      state.streak = 0;
+      flash(false);
+      el.promptWord.textContent = `pravilno: ${cur.word}`;
+    }
+
+    renderStats();
+    el.answerInput.value = "";
+
+    setTimeout(() => {
+      state.weakCurrent = pickNextWeak(cur.letter);
+      renderScreen();
+      el.answerInput.focus();
+    }, ok ? 260 : 750);
+  }
+
+  function skip(){
+    if(state.mode === 3){ skipWeak(); return; }
+    const cur = state.queue[state.idx];
+    if(!cur) return;
+    recordLetterResult(cur.letter, false);
+    state.results[state.idx] = "bad";
+    state.streak = 0;
+    renderStats();
+    state.idx++;
+    el.answerInput.value = "";
+    renderScreen();
+    el.answerInput.focus();
+  }
+
+  function skipWeak(){
+    const cur = state.weakCurrent;
+    if(!cur) return;
+    recordLetterResult(cur.letter, false);
+    state.weakHistory.push("bad");
+    if(state.weakHistory.length > 14) state.weakHistory.shift();
+    state.streak = 0;
+    renderStats();
+    el.answerInput.value = "";
+    state.weakCurrent = pickNextWeak(cur.letter);
+    renderScreen();
+    el.answerInput.focus();
+  }
+
+  function restart(){
+    if(state.mode === 3){
+      startWeakMode();
+    } else {
+      buildQueue();
+    }
+    renderScreen();
+    el.answerInput.value = "";
+    el.answerInput.focus();
+  }
+
+  function resetAll(){
+    state.score = 0; state.attempts = 0; state.streak = 0;
+    renderStats();
+    restart();
+  }
+
+  function buildRefTable(){
+    const alpha = currentAlphabet();
+    const stats = state.weakStats[state.lang];
+    el.refTable.innerHTML = alpha.letters.map(([l,w]) => {
+      const weak = stats[l] && stats[l].weak;
+      return `<div class="ref-item${weak ? " weak" : ""}"><b>${l}</b><span>${w}</span></div>`;
+    }).join("");
+  }
+
+  // events
+  el.langToggle.addEventListener("keydown", (e) => {
+    if(e.key === "Enter" || e.key === " "){ e.preventDefault(); el.langToggle.click(); }
+  });
+  el.langToggle.addEventListener("click", () => {
+    state.lang = state.lang === "si" ? "en" : "si";
+    el.langToggle.classList.toggle("on", state.lang === "en");
+    el.lblSi.classList.toggle("active", state.lang === "si");
+    el.lblEn.classList.toggle("active", state.lang === "en");
+    state.customWord = null;
+    el.customWordInput.value = "";
+    buildRefTable();
+    updateWeakBadge();
+    resetAll();
+  });
+
+  el.modeBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.mode = Number(btn.dataset.mode);
+      updateModeButtons();
+      resetAll();
+    });
+  });
+
+  el.useCustomWord.addEventListener("click", () => {
+    const v = el.customWordInput.value.trim();
+    if(v === "") return;
+    state.customWord = v;
+    resetAll();
+  });
+  el.customWordInput.addEventListener("keydown", (e) => {
+    if(e.key === "Enter") el.useCustomWord.click();
+  });
+
+  el.submitBtn.addEventListener("click", submit);
+  el.answerInput.addEventListener("keydown", (e) => {
+    if(e.key === "Enter") submit();
+  });
+  el.skipBtn.addEventListener("click", skip);
+  el.restartBtn.addEventListener("click", resetAll);
+
+  el.refToggle.addEventListener("click", () => {
+    buildRefTable();
+    const open = el.refTable.classList.toggle("show");
+    el.refToggle.classList.toggle("open", open);
+  });
+
+  // init
+  el.lblSi.classList.add("active");
+  updateModeButtons();
+  buildRefTable();
+  updateWeakBadge();
+  resetAll();
+})();
+</script>
+
+</body>
+</html>
