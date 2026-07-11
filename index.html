@@ -88,9 +88,10 @@
   /* header */
   .header{
     display:flex;
+    flex-wrap:wrap;
     align-items:flex-start;
     justify-content:space-between;
-    gap:16px;
+    gap:12px 16px;
     margin-bottom:20px;
     padding-bottom:16px;
     border-bottom:1px solid var(--seam);
@@ -314,6 +315,7 @@
   }
   .input-row input{
     flex:1;
+    min-width:0;
     font-family:var(--font-mono);
     font-size:16px;
     font-weight:600;
@@ -373,6 +375,7 @@
   .custom-word.show{display:flex;}
   .custom-word input{
     flex:1;
+    min-width:0;
     font-family:var(--font-mono);
     font-size:13px;
     background:var(--panel-2);
@@ -428,10 +431,29 @@
   footer.hint b{color:var(--amber-dim);}
 
   @media (max-width:480px){
+    body{padding:16px 10px;}
+    .console-inner{padding:20px 16px 18px;}
     .brand h1{font-size:26px;}
     .letter-big{font-size:64px;}
     .modes{grid-template-columns:repeat(2,1fr); }
     .stats{gap:12px;}
+    .input-row{gap:8px;}
+    .btn{padding:0 14px; font-size:12px;}
+  }
+
+  @media (max-width:360px){
+    .brand h1{font-size:22px;}
+    .brand .kicker{font-size:9px;}
+    .letter-big{font-size:52px;}
+    .lcd{padding:16px 12px 14px; min-height:140px;}
+    .tile{width:28px; height:34px; font-size:16px;}
+    .input-row{flex-wrap:wrap;}
+    .input-row input{flex-basis:100%;}
+    .input-row .btn{flex:1;}
+    .stats{gap:10px;}
+    .stat .v{font-size:18px;}
+    .actions{gap:6px;}
+    .actions .btn{padding:0 10px; font-size:11px;}
   }
 </style>
 </head>
