@@ -1092,6 +1092,13 @@
     renderStats();
     el.answerInput.value = "";
     renderScreen();
+
+    // ob popolnoma pravilnem odgovoru samodejno naloži naslednjo besedo
+    if(allOk){
+      setTimeout(() => {
+        if(state.mode === 2 && state.wordSubmitted) nextWholeWord();
+      }, 1200);
+    }
   }
 
   // "Preskoči" pri načinu 03: naloži novo (drugo) besedo
