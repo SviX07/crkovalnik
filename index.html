@@ -156,6 +156,34 @@
     transition:left .22s cubic-bezier(.7,-0.3,.3,1.3);
   }
   .toggle.on .knob{left:28px; background:radial-gradient(circle at 35% 30%, #b9ffd2, var(--green) 60%, var(--green-dim) 100%); box-shadow:0 2px 4px rgba(0,0,0,0.5), 0 0 10px rgba(93,255,160,0.5);}
+  .toggle.disabled{opacity:0.4; cursor:not-allowed;}
+
+  .io-row{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  .io-row-label{
+    font-size:10px;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:var(--cream-dim);
+    font-weight:600;
+  }
+
+  .btn.mic{
+    background:linear-gradient(180deg, var(--green), #1e8a52);
+    color:#062715;
+    box-shadow:0 3px 0 #0d3a1f, 0 1px 0 rgba(255,255,255,0.3) inset;
+  }
+  .btn.mic.listening{ animation:micPulse 1.1s infinite; }
+  @keyframes micPulse{
+    0%,100%{ box-shadow:0 3px 0 #0d3a1f, 0 0 0 0 rgba(93,255,160,0.55); }
+    50%{ box-shadow:0 3px 0 #0d3a1f, 0 0 0 9px rgba(93,255,160,0); }
+  }
 
   /* mode buttons */
   .modes{
@@ -475,6 +503,15 @@
       </div>
     </div>
 
+    <div class="io-row">
+      <span class="io-row-label">način vnosa</span>
+      <div class="lang-switch">
+        <span class="lbl active" id="lblIoText">⌨ Tipka</span>
+        <div class="toggle" id="ioToggle" role="button" tabindex="0" aria-label="Preklopi način vnosa med tipkovnico in glasom"><div class="knob"></div></div>
+        <span class="lbl" id="lblIoVoice">🎙 Glas</span>
+      </div>
+    </div>
+
     <div class="modes">
       <button class="mode-btn active" data-mode="0">
         <div class="num">NAČIN 01</div>
@@ -531,6 +568,7 @@
         <div class="stat"><div class="v" id="statAcc">100%</div><div class="l">Natančnost</div></div>
       </div>
       <div class="actions">
+        <button class="btn ghost" id="speakBtn" style="display:none;">🔊 Ponovi</button>
         <button class="btn ghost" id="skipBtn">Preskoči</button>
         <button class="btn ghost" id="restartBtn">Znova</button>
       </div>
@@ -595,7 +633,9 @@
     customWord: null,
     weakStats: { si: loadWeakStats("si"), en: loadWeakStats("en") }, // per-language: {LETTER: {weak, streak}}
     weakCurrent: null,   // {letter, word} currently shown in mode 3
-    weakHistory: []       // rolling 'ok'/'bad' trail for mode 3
+    weakHistory: [],      // rolling 'ok'/'bad' trail for mode 3
+    ioMode: "text",       // "text" | "voice"
+    listening: false
   };
 
   const el = {
@@ -622,6 +662,10 @@
     refToggle: document.getElementById("refToggle"),
     refTable: document.getElementById("refTable"),
     weakCountBadge: document.getElementById("weakCountBadge"),
+    ioToggle: document.getElementById("ioToggle"),
+    lblIoText: document.getElementById("lblIoText"),
+    lblIoVoice: document.getElementById("lblIoVoice"),
+    speakBtn: document.getElementById("speakBtn"),
   };
 
   function shuffle(arr){
@@ -719,6 +763,90 @@
     state.weakCurrent = pickNextWeak(null);
   }
 
+  // --- glasovni način: izgovorjava črke (TTS) in prepoznava odgovora (STT) ---
+  const SR_CTOR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  const TTS_SUPPORTED = "speechSynthesis" in window;
+  let recognition = null;
+
+  function langCode(){ return state.lang === "si" ? "sl-SI" : "en-US"; }
+
+  function speak(text){
+    if(!TTS_SUPPORTED || !text) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = langCode();
+    u.rate = 0.85;
+    const voices = window.speechSynthesis.getVoices();
+    const wanted = u.lang.toLowerCase();
+    const base = wanted.split("-")[0];
+    const match = voices.find(v => v.lang && v.lang.toLowerCase() === wanted) ||
+                  voices.find(v => v.lang && v.lang.toLowerCase().startsWith(base));
+    if(match) u.voice = match;
+    window.speechSynthesis.speak(u);
+  }
+
+  function currentPromptLetter(){
+    if(state.mode === 3) return state.weakCurrent ? state.weakCurrent.letter : null;
+    const cur = state.queue[state.idx];
+    return cur ? cur.letter : null;
+  }
+
+  function speakCurrentPrompt(){
+    if(state.ioMode !== "voice") return;
+    const letter = currentPromptLetter();
+    if(letter) speak(letter);
+  }
+
+  function stopListeningUI(){
+    state.listening = false;
+    el.submitBtn.classList.remove("listening");
+    el.submitBtn.textContent = "🎙 Govori";
+  }
+
+  function startListening(){
+    if(el.answerInput.disabled) return;
+    if(!SR_CTOR){
+      el.promptWord.textContent = "prepoznava govora ni podprta v tem brskalniku (poskusi Chrome/Edge)";
+      return;
+    }
+    if(recognition){ try{ recognition.abort(); }catch(e){} }
+    window.speechSynthesis && window.speechSynthesis.cancel();
+
+    recognition = new SR_CTOR();
+    recognition.lang = langCode();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    state.listening = true;
+    el.submitBtn.classList.add("listening");
+    el.submitBtn.textContent = "● Poslušam …";
+    el.answerInput.value = "";
+
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript.trim();
+      el.answerInput.value = transcript;
+      stopListeningUI();
+      if(transcript) submit();
+    };
+    recognition.onerror = () => { stopListeningUI(); };
+    recognition.onend = () => { stopListeningUI(); };
+
+    try{ recognition.start(); }
+    catch(e){ stopListeningUI(); }
+  }
+
+  function applyIoModeUI(){
+    const voice = state.ioMode === "voice";
+    el.answerInput.readOnly = voice;
+    el.answerInput.placeholder = voice ? "pritisni mikrofon in izgovori besedo …" : "vtipkaj besedo za to črko …";
+    el.speakBtn.style.display = voice ? "inline-block" : "none";
+    el.submitBtn.classList.toggle("mic", voice);
+    stopListeningUI();
+    if(!voice) el.submitBtn.textContent = "Preveri";
+    el.answerInput.value = "";
+  }
+
   function updateModeButtons(){
     el.modeBtns.forEach(btn => {
       btn.classList.toggle("active", Number(btn.dataset.mode) === state.mode);
@@ -772,6 +900,7 @@
       el.promptWord.textContent = "vpiši besedo za to črko";
     }
     renderProgress();
+    speakCurrentPrompt();
   }
 
   function renderWeakScreen(){
@@ -789,6 +918,7 @@
       el.answerInput.disabled = false;
     }
     renderWeakProgress();
+    speakCurrentPrompt();
   }
 
   function renderWeakProgress(){
@@ -942,6 +1072,12 @@
   el.langToggle.addEventListener("keydown", (e) => {
     if(e.key === "Enter" || e.key === " "){ e.preventDefault(); el.langToggle.click(); }
   });
+  function cancelSpeech(){
+    if(recognition){ try{ recognition.abort(); }catch(e){} }
+    if(window.speechSynthesis) window.speechSynthesis.cancel();
+    stopListeningUI();
+  }
+
   el.langToggle.addEventListener("click", () => {
     state.lang = state.lang === "si" ? "en" : "si";
     el.langToggle.classList.toggle("on", state.lang === "en");
@@ -949,15 +1085,34 @@
     el.lblEn.classList.toggle("active", state.lang === "en");
     state.customWord = null;
     el.customWordInput.value = "";
+    cancelSpeech();
     buildRefTable();
     updateWeakBadge();
     resetAll();
+  });
+
+  el.ioToggle.addEventListener("keydown", (e) => {
+    if(e.key === "Enter" || e.key === " "){ e.preventDefault(); el.ioToggle.click(); }
+  });
+  el.ioToggle.addEventListener("click", () => {
+    if(!SR_CTOR){
+      el.promptWord.textContent = "prepoznava govora ni podprta v tem brskalniku (poskusi Chrome/Edge)";
+      return;
+    }
+    state.ioMode = state.ioMode === "text" ? "voice" : "text";
+    el.ioToggle.classList.toggle("on", state.ioMode === "voice");
+    el.lblIoText.classList.toggle("active", state.ioMode === "text");
+    el.lblIoVoice.classList.toggle("active", state.ioMode === "voice");
+    cancelSpeech();
+    applyIoModeUI();
+    speakCurrentPrompt();
   });
 
   el.modeBtns.forEach(btn => {
     btn.addEventListener("click", () => {
       state.mode = Number(btn.dataset.mode);
       updateModeButtons();
+      cancelSpeech();
       resetAll();
     });
   });
@@ -972,12 +1127,16 @@
     if(e.key === "Enter") el.useCustomWord.click();
   });
 
-  el.submitBtn.addEventListener("click", submit);
-  el.answerInput.addEventListener("keydown", (e) => {
-    if(e.key === "Enter") submit();
+  el.submitBtn.addEventListener("click", () => {
+    if(state.ioMode === "voice") startListening();
+    else submit();
   });
-  el.skipBtn.addEventListener("click", skip);
-  el.restartBtn.addEventListener("click", resetAll);
+  el.answerInput.addEventListener("keydown", (e) => {
+    if(e.key === "Enter" && state.ioMode === "text") submit();
+  });
+  el.speakBtn.addEventListener("click", () => speakCurrentPrompt());
+  el.skipBtn.addEventListener("click", () => { cancelSpeech(); skip(); });
+  el.restartBtn.addEventListener("click", () => { cancelSpeech(); resetAll(); });
 
   el.refToggle.addEventListener("click", () => {
     buildRefTable();
@@ -987,6 +1146,11 @@
 
   // init
   el.lblSi.classList.add("active");
+  if(!SR_CTOR){
+    el.ioToggle.classList.add("disabled");
+    el.ioToggle.setAttribute("aria-disabled", "true");
+  }
+  applyIoModeUI();
   updateModeButtons();
   buildRefTable();
   updateWeakBadge();
